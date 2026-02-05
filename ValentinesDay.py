@@ -2,156 +2,184 @@ import streamlit as st
 import json
 import os
 
-# --- PAGE SETUP ---
-st.set_page_config(page_title="Valentine Invitation", page_icon="💝", layout="centered")
+# --- ARCHITECTURAL SETUP ---
+st.set_page_config(page_title="ValRequest | Christian Hoy", page_icon="💘", layout="centered")
 
-# --- DATA PERSISTENCE (THE TRACKER) ---
-DB_FILE = "response_stats.json"
+# Data persistence for the "Yes/No" tracker
+DB_FILE = "analytics.json"
 
-def get_stats():
+def load_analytics():
     if not os.path.exists(DB_FILE):
-        return {"yes": 0, "no": 0}
+        return {"yes_total": 0, "no_total": 0}
     with open(DB_FILE, "r") as f:
-        return json.load(f)
+        try:
+            return json.load(f)
+        except:
+            return {"yes_total": 0, "no_total": 0}
 
-def update_stats(choice):
-    stats = get_stats()
-    stats[choice] += 1
+def track_click(type):
+    stats = load_analytics()
+    if type == "yes":
+        stats["yes_total"] += 1
+    else:
+        stats["no_total"] += 1
     with open(DB_FILE, "w") as f:
         json.dump(stats, f)
 
-# --- SESSION STATE ---
+# --- SESSION STATE MANAGEMENT ---
 if 'clicks' not in st.session_state:
     st.session_state.clicks = 0
+if 'stage' not in st.session_state:
+    st.session_state.stage = "HEART" # HEART -> PROPOSAL -> SUCCESS
 if 'no_count' not in st.session_state:
     st.session_state.no_count = 0
-if 'yes_size' not in st.session_state:
-    st.session_state.yes_size = 30 # Initial font size in pixels
+if 'yes_scale' not in st.session_state:
+    st.session_state.yes_scale = 1.0
 
-# --- DANGER DEVELOPMENT CUSTOM CSS ---
-# Centering logic, glossy UI, and the beating heart animation
-beat_speed = max(0.2, 1.2 - (st.session_state.clicks * 0.1))
-heart_scale = 1 + (st.session_state.clicks * 0.15)
+# --- CUSTOM CSS (GLOSSY UI & CENTERING) ---
+# We use a custom font-family and linear gradients to match the reference images.
+beat_speed = max(0.1, 1.0 - (st.session_state.clicks * 0.1))
+heart_size = 100 + (st.session_state.clicks * 20)
 
 st.markdown(f"""
 <style>
-    /* Absolute Centering */
+    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;700&display=swap');
+
     .stApp {{
         background-color: #F5F5DC;
+    }}
+
+    /* Full screen centering */
+    .main-wrapper {{
         display: flex;
-        justify-content: center;
+        flex-direction: column;
         align-items: center;
+        justify-content: center;
+        text-align: center;
+        min-height: 80vh;
+    }}
+
+    /* Typography */
+    .title-text {{
+        font-family: 'Dancing Script', cursive;
+        color: #800020;
+        font-size: 3.5rem;
+        margin-bottom: 10px;
     }}
     
-    .centered-container {{
-        text-align: center;
-        max-width: 600px;
-        margin: auto;
+    .instruction-text {{
+        font-family: 'Inter', sans-serif;
+        color: #800020;
+        font-weight: 700;
+        font-size: 1.2rem;
+        margin-bottom: 30px;
     }}
 
-    /* Readability: High-contrast Raspberry Maroon text */
-    h1, h2, h3, p, div {{
-        color: #800020 !important;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    }}
-
-    /* Glossy Pink UI for Buttons */
-    .stButton > button {{
-        background: linear-gradient(145deg, #ffc0cb, #ff8da1) !important;
-        color: white !important;
-        border-radius: 25px !important;
-        border: 2px solid #ff8da1 !important;
-        box-shadow: 4px 4px 10px rgba(0,0,0,0.1), inset -2px -2px 5px rgba(255,255,255,0.4) !important;
-        font-weight: bold !important;
-        transition: transform 0.2s ease;
-    }}
-
-    /* Massive Clickable Heart Styling */
-    button[kind="secondary"]:has(div:contains("💗")) {{
-        font-size: 150px !important;
+    /* The Massive Clickable Heart */
+    .heart-btn button {{
         background: none !important;
         border: none !important;
-        box-shadow: none !important;
-        animation: heartbeat {beat_speed}s infinite;
-        transform: scale({heart_scale});
+        font-size: {heart_size}px !important;
+        padding: 0 !important;
+        cursor: pointer;
+        animation: heart-beat {beat_speed}s infinite;
+        transition: all 0.2s ease-in-out;
     }}
 
-    @keyframes heartbeat {{
-        0% {{ transform: scale({heart_scale}); }}
-        50% {{ transform: scale({heart_scale + 0.1}); }}
-        100% {{ transform: scale({heart_scale}); }}
+    @keyframes heart-beat {{
+        0% {{ transform: scale(1); }}
+        50% {{ transform: scale(1.1); }}
+        100% {{ transform: scale(1); }}
     }}
 
-    /* Dynamic YES button scaling */
-    .yes-btn button {{
-        font-size: {st.session_state.yes_size}px !important;
-        padding: 20px 40px !important;
+    /* Glossy Pink Buttons */
+    .stButton > button {{
+        border-radius: 50px !important;
+        border: none !important;
+        font-family: 'Inter', sans-serif !important;
+        font-weight: 700 !important;
+        box-shadow: 0 10px 20px rgba(255, 105, 180, 0.3), inset 0 -4px 8px rgba(0,0,0,0.1) !important;
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    }}
+
+    .yes-container button {{
+        background: linear-gradient(135deg, #FF69B4, #FF1493) !important;
+        color: white !important;
+        transform: scale({st.session_state.yes_scale}) !important;
+    }}
+
+    .no-container button {{
+        background: #FFB6C1 !important;
+        color: #800020 !important;
+    }}
+
+    .footer {{
+        margin-top: 50px;
+        color: #FF69B4;
+        font-size: 0.9rem;
     }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- APP UI ---
-st.markdown('<div class="centered-container">', unsafe_allow_html=True)
+# --- APPLICATION CORE ---
+st.markdown('<div class="main-wrapper">', unsafe_allow_html=True)
 
-# STAGE 1: THE HEART CLICKS
-if st.session_state.clicks < 10:
-    st.markdown("<h1>🏹 A Special Message 🏹</h1>", unsafe_allow_html=True)
-    st.markdown("<h3>Click the heart 10 times!</h3>", unsafe_allow_html=True)
+if st.session_state.stage == "HEART":
+    st.markdown('<h1 class="title-text">A Special Message 🏹</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="instruction-text">Click the heart 10 times!</p>', unsafe_allow_html=True)
     
-    # Progress Messages
-    msgs = ["You can do it!", "I love you", "Keep going!", "Harder!", "Almost!", "So close!", "BEATING FAST!", "Ready?", "Now!", "BOOM!"]
+    # Message Logic
+    prompts = ["You can do it!", "I love you!", "Almost there!", "Don't stop!", "Keep going!", "Beating faster!", "POPPING!", "Ready?", "Now!", "BOOM!"]
     if st.session_state.clicks > 0:
-        st.markdown(f"**{msgs[st.session_state.clicks-1]}**")
+        current_msg = prompts[min(st.session_state.clicks-1, 9)]
+        st.markdown(f'<p style="color: #FF1493; font-weight: bold;">{current_msg}</p>', unsafe_allow_html=True)
 
-    # The Clickable Heart
-    if st.button("💗", key="heart_btn"):
+    # Clickable Heart
+    st.markdown('<div class="heart-btn">', unsafe_allow_html=True)
+    if st.button("💗", key="heart_click"):
         st.session_state.clicks += 1
+        if st.session_state.clicks >= 10:
+            st.session_state.stage = "PROPOSAL"
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# STAGE 2: THE PROPOSAL
-else:
-    if "answered" not in st.session_state:
-        st.markdown("<h1>Will you be my Valentine? 🌹</h1>", unsafe_allow_html=True)
-        
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            st.markdown('<div class="yes-btn">', unsafe_allow_html=True)
-            if st.button("YES! 💖", key="yes_btn"):
-                update_stats("yes")
-                st.session_state.answered = True
+elif st.session_state.stage == "PROPOSAL":
+    st.markdown('<h1 class="title-text">Will you be my Valentine? 🌹</h1>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown('<div class="yes-container">', unsafe_allow_html=True)
+        if st.button("YES! 💖", key="final_yes", use_container_width=True):
+            track_click("yes")
+            st.session_state.stage = "SUCCESS"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        if st.session_state.no_count < 14:
+            st.markdown('<div class="no-container">', unsafe_allow_html=True)
+            if st.button("No 💔", key="final_no", use_container_width=True):
+                st.session_state.no_count += 1
+                st.session_state.yes_scale += 0.7  # Aggressive growth
+                track_click("no")
+                if st.session_state.no_count >= 10:
+                    st.toast("Will a box of chocolates change your mind? 🍫")
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-            
-        with col2:
-            if st.session_state.no_count < 14:
-                if st.button("No 💔", key="no_btn"):
-                    st.session_state.no_count += 1
-                    st.session_state.yes_size += 15 # Increase size of YES
-                    update_stats("no")
-                    if st.session_state.no_count >= 10:
-                        st.toast("Will a box of chocolates change your mind? 🍫")
-                    st.rerun()
-            else:
-                st.markdown("<p><i>No is no longer an option...</i> 😉</p>", unsafe_allow_html=True)
+        else:
+            st.markdown('<p style="font-style: italic; color: #800020;">No is no longer an option... 😉</p>', unsafe_allow_html=True)
 
-    else:
-        # THE SUCCESS SCREEN
-        st.balloons()
-        st.markdown("<h1>I knew you'd say yes! 🥰</h1>", unsafe_allow_html=True)
-        
-        # Display Stats System
-        stats = get_stats()
-        st.markdown("---")
-        st.markdown("### 📊 Danger Production Analytics")
-        st.write(f"Total 'Yes' Responses: {stats['yes']}")
-        st.write(f"Total 'No' Attempts: {stats['no']}")
+elif st.session_state.stage == "SUCCESS":
+    st.balloons()
+    st.markdown('<h1 class="title-text">I knew you\'d say yes! 🥰</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="instruction-text">You have made my Valentine\'s Day unforgettable.</p>', unsafe_allow_html=True)
+    
+    # Analytics View
+    stats = load_analytics()
+    st.markdown("---")
+    st.markdown(f"**💖 Global 'Yes' Count:** {stats['yes_total']}")
+    st.markdown(f"**💔 Global 'No' Attempts:** {stats['no_total']}")
 
+st.markdown('<div class="footer">🏹 Crafted by Danger Development for Christian Hoy 💘</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
-
-# Footer Styling
-st.markdown("""
-    <div style="margin-top: 50px; opacity: 0.7;">
-        <p>💘 Crafted by Danger Development made by Christian Hoy 🏹</p>
-    </div>
-""", unsafe_allow_html=True)
